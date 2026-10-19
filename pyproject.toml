@@ -1,0 +1,25 @@
+[project]
+name = "graphcontext"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "nishika-7", email = "nishika.j77@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "falkordb>=1.8.0",
+    "pydriller>=2.12",
+    "python-dotenv>=1.2.4",
+    "pyvis>=0.3.2",
+    "strands-agents[openai]>=1.61.0",
+    "streamlit>=1.66.0",
+    "unidiff>=1.0.1",
+]
+
+[project.scripts]
+graphcontext = "graphcontext:main"
+
+[build-system]
+requires = ["uv_build>=0.12.19,<0.13.0"]
+build-backend = "uv_build"

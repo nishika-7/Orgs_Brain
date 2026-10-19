@@ -1,0 +1,7 @@
+falkordb
+pydriller 
+python-dotenv 
+streamlit 
+pyvis
+strands-agents[openai]
+
