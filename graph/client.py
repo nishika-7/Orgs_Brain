@@ -1,24 +1,60 @@
 """FalkorDB connection plus a query helper that records a trace of every query.
 
-The trace is what powers the "How I got this" box in the UI later: every tool
-calls run_query(), so we always know which Cypher produced which answer.
+The trace powers the "How I got this" panels: every analysis runs through run_query(), so we
+always know which Cypher produced which answer. The trace is kept PER THREAD, because a web app
+serves several visitors from one process and their traces must not mix.
+
+If you already edited your own copy of this file (SSL, username...), keep your edits: the only
+changes here are the per-thread trace and the optional FALKORDB_SSL setting.
 
 Smoke test:  uv run python -m graph.client
 """
+import threading
 import time
 
 from falkordb import FalkorDB
 
-import config 
-import os
-from dotenv import load_dotenv
-load_dotenv()
+import config
 
 _db = None
 _graph = None
 
+
+class _Trace:
+    """A list-like object with a separate list for each thread."""
+
+    def __init__(self):
+        self._local = threading.local()
+
+    def _items(self) -> list:
+        if not hasattr(self._local, "items"):
+            self._local.items = []
+        return self._local.items
+
+    def append(self, item) -> None:
+        self._items().append(item)
+
+    def clear(self) -> None:
+        self._items().clear()
+
+    def snapshot(self) -> list:
+        return list(self._items())
+
+    def __iter__(self):
+        return iter(self._items())
+
+    def __len__(self) -> int:
+        return len(self._items())
+
+    def __bool__(self) -> bool:
+        return bool(self._items())
+
+    def __getitem__(self, i):
+        return self._items()[i]
+
+
 # One entry per query: {"tool", "cypher", "params", "rows", "ms"}
-trace: list[dict] = []
+trace = _Trace()
 
 
 def get_graph():
@@ -31,7 +67,7 @@ def get_graph():
                 port=config.FALKOR_PORT,
                 username=config.FALKOR_USERNAME,
                 password=config.FALKOR_PASSWORD,
-                ssl=config.FALKOR_SSL
+                ssl=getattr(config, "FALKOR_SSL", False),
             )
         _graph = _db.select_graph(config.GRAPH_NAME)
     return _graph
@@ -69,6 +105,10 @@ def run_query(tool: str, cypher: str, params: dict | None = None, read_only: boo
 
 def clear_trace() -> None:
     trace.clear()
+
+
+def snapshot_trace() -> list:
+    return trace.snapshot()
 
 
 if __name__ == "__main__":

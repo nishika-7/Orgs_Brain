@@ -98,15 +98,15 @@ def _narrow(cands: list[dict], hints: set[str]) -> list[dict]:
     return cands
 
 
-def prepare(question: str) -> Prepared:
+def prepare(question: str, diff_text: str | None = None) -> Prepared:
     q = " " + question.lower() + " "
     tokens = _tokens(question)
     hints = _file_hints(question, tokens)
     prep = Prepared()
 
-    # 1) a loaded diff
-    if T.has_current_diff() and any(w in q for w in DIFF_WORDS):
-        prep.evidence = T.analyze_diff("CURRENT")
+    # 1) a diff passed in (web app) or loaded globally (terminal chat)
+    if (diff_text or T.has_current_diff()) and any(w in q for w in DIFF_WORDS):
+        prep.evidence = T.analyze_diff(diff_text or "CURRENT")
         prep.used = ["analyze_diff"]
         return _wrap(question, prep)
 
@@ -203,9 +203,9 @@ def _rate_limited(exc: Exception) -> bool:
     return any(w in text for w in ("rate", "429", "throttl", "quota", "too many", "tokens per"))
 
 
-def ask(agent, question: str) -> tuple[str, Prepared]:
+def ask(agent, question: str, diff_text: str | None = None) -> tuple[str, Prepared]:
     """Answer one question. Returns (answer text, the Prepared object for the UI)."""
-    prep = prepare(question)
+    prep = prepare(question, diff_text)
     if prep.direct:
         return prep.direct, prep
 

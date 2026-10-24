@@ -340,4 +340,3 @@ def key_files(limit: int = 8) -> str:
 
 
 ALL_TOOLS = [find_functions, risk_report, update_checklist, who_to_ask, analyze_diff, trace_flow, key_files]
-

@@ -29,8 +29,4 @@ callbacks.
 **Easy to miss:** files that keep changing with this code but have no code link, and the specific blind \
 spots from the evidence. Skip this section if there are none.
 **Ask / review:** people, each with the reason from the evidence.
-For onboarding questions use a short plain explanation instead of this format.
- 
-For ANY question about changing, removing, renaming or no longer using a function, call risk_report \
-before giving a verdict. Never tell the user to run a tool yourself; call it.”
-"""
+For onboarding questions use a short plain explanation instead of this format."""

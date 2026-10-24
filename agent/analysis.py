@@ -1,4 +1,4 @@
-"""Graph analysis for the "what is safe to change, and who do I ask?" agent.
+"""Graph analysis for the "whaat is safe to change, and who do I ask?" agent.
 
 Plain Python + Cypher. No LLM and no agent framework in this file, so it can be
 tested on its own. The Strands tools in tools.py are thin wrappers around it.
@@ -12,15 +12,11 @@ import re
 from collections import Counter, defaultdict
 from functools import lru_cache
 from pathlib import Path
-import os
-from dotenv import load_dotenv
-load_dotenv()
 
 import config
 from graph.client import run_query
-import os
-MAX_DEPTH = 4
 
+MAX_DEPTH = 4
 COCHANGE_MAX_FILES = 25  # commits touching more files than this are bulk edits, not evidence of coupling
 
 
@@ -786,3 +782,38 @@ def analyze_diff(diff_text: str, depth: int = 3, max_functions: int = 8) -> dict
         "reviewers": [info[e] for e, _ in tally.most_common(3)],
         "truncated": sum(len(c["functions"]) for c in changes) > max_functions,
     }
+
+
+# ------------------------------------------------------------------ helpers for the UI
+
+def edges_among(uids: list[str]) -> list[tuple[str, str]]:
+    """Call/callback edges between the given functions (to draw the blast-radius graph)."""
+    if not uids:
+        return []
+    rows = run_query(
+        "blast_graph",
+        """MATCH (a:Function)-[:CALLS|REFERENCES]->(b:Function)
+           WHERE a.uid IN $u AND b.uid IN $u
+           RETURN a.uid, b.uid""",
+        {"u": uids},
+    ).result_set
+    return [(r[0], r[1]) for r in rows]
+
+
+def hot_spots(limit: int = 6) -> list[dict]:
+    """Production functions with the most distinct production callers: good starting points."""
+    rows = run_query(
+        "hot_spots",
+        f"""MATCH (c:Function)-[:CALLS|REFERENCES]->(f:Function)
+            WHERE f.is_test = false AND c.is_test = false
+            RETURN f.uid, f.qualname, f.file, count(DISTINCT c) AS n
+            ORDER BY n DESC LIMIT {int(limit)}""",
+    ).result_set
+    return [{"uid": r[0], "qualname": r[1], "file": r[2], "callers": r[3]} for r in rows]
+
+
+def graph_stats() -> tuple[dict, dict]:
+    """(node counts by label, relationship counts by type)."""
+    nodes = {r[0]: r[1] for r in run_query("stats", "MATCH (n) RETURN labels(n)[0], count(n)").result_set}
+    rels = {r[0]: r[1] for r in run_query("stats", "MATCH ()-[r]->() RETURN type(r), count(r)").result_set}
+    return nodes, rels

@@ -10,6 +10,7 @@ Tabs:
 
 Only the chat explanation needs the language model. Everything else runs on the graph alone.
 """
+import inspect
 import os
 import re
 import subprocess
@@ -33,10 +34,11 @@ except Exception:  # no secrets file locally: that is fine, .env is used instead
 
 import config  # noqa: E402
 from agent import analysis as A  # noqa: E402
+from agent import tools as T  # noqa: E402
 from agent.orchestrate import ask, prepare  # noqa: E402
 from graph import client  # noqa: E402
 from UserInterface import components as C  # noqa: E402
-from UserInterface   import graph_view  # noqa: E402
+from UserInterface import graph_view  # noqa: E402
 
 
 # ------------------------------------------------------------------ setup
@@ -70,12 +72,40 @@ def cached_hot_spots():
     return A.hot_spots(6)
 
 
+def check_install() -> None:
+    """The app, the agent code and the ingest code ship together. Catch a half-updated project
+    with a clear message instead of a confusing crash."""
+    problems = []
+    needs = [
+        (A, "agent/analysis.py", ["graph_stats", "hot_spots", "edges_among", "risk_report", "analyze_diff",
+                                  "update_checklist", "hidden_coupling", "blind_spots", "search_functions"]),
+        (client, "graph/client.py", ["snapshot_trace", "clear_trace", "run_query"]),
+        (T, "agent/tools.py", ["update_checklist", "resolve_target", "has_current_diff"]),
+    ]
+    for mod, path, attrs in needs:
+        missing = [a for a in attrs if not hasattr(mod, a)]
+        if missing:
+            problems.append(f"`{path}` is out of date (missing: {', '.join(missing)})")
+    if "diff_text" not in inspect.signature(prepare).parameters:
+        problems.append("`agent/orchestrate.py` is out of date (prepare() has no diff_text)")
+    if problems:
+        st.error("Some project files are older than this `app.py`. Copy the latest versions from the zip, then restart Streamlit:")
+        for item in problems:
+            st.markdown(f"- {item}")
+        st.stop()
+
+
 def check_graph():
     try:
         nodes, rels = cached_stats()
     except Exception as exc:  # noqa: BLE001
-        st.error("Cannot reach the graph database. Check the FALKORDB_* settings (host, port, username, password).")
+        st.error("The first query to the graph database failed.")
         st.code(f"{type(exc).__name__}: {exc}")
+        st.markdown(
+            "If this mentions a connection, timeout or authentication problem, check the `FALKORDB_*` settings "
+            "(host, port, username, password, `FALKORDB_SSL`). If it mentions an attribute or import, some "
+            "project files are out of date: copy the latest `agent/`, `ingest/`, `ui/` and `graph/client.py` from the zip."
+        )
         st.stop()
     if not nodes.get("Function"):
         st.warning(
@@ -194,6 +224,7 @@ def render_messages() -> None:
 
 # ------------------------------------------------------------------ page
 
+check_install()
 nodes, rels = check_graph()
 ensure_repo()
 agent = get_agent()
